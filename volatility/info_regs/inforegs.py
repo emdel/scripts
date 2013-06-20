@@ -26,6 +26,7 @@ import volatility.plugins.linux.pslist as linux_pslist
 import struct
 
 
+# x86 offset - It works on my Linux machine.
 ir_offset = {
 "eax" : 0xfcc,
 "ebx" : 0xfb4,
