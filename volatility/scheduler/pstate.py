@@ -117,10 +117,6 @@ class linux_pstate(linux_common.AbstractLinuxCommand):
 
     def generator(self, data):
         for task in data:
-            if task.mm.pgd == None:
-                dtb = task.mm.pgd
-            else:
-                dtb = self.addr_space.vtop(task.mm.pgd) or task.mm.pgd
             yield (0, [
                                   str(task.comm),
                                   int(task.pid),
