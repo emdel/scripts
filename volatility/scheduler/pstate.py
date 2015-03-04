@@ -106,7 +106,8 @@ class linux_pstate(linux_common.AbstractLinuxCommand):
                        ("Uid", str),
                        ("Gid", str),
                        ("State", str),
-                       ("Exit State", str)],
+                       ("Exit State", str),
+                       ("CPU #", int)],
                         self.generator(data))
 
     def get_state(self, state):
@@ -118,10 +119,11 @@ class linux_pstate(linux_common.AbstractLinuxCommand):
     def generator(self, data):
         for task in data:
             yield (0, [
-                                  str(task.comm),
-                                  int(task.pid),
-                                  str(task.uid) if task.uid else "-",
-                                  str(task.gid) if task.gid else "-",
-                                  self.get_state(task.state),
-                                  self.get_exit(task.exit_state)])
+                      str(task.comm),
+                      int(task.pid),
+                      str(task.uid) if task.uid else "-",
+                      str(task.gid) if task.gid else "-",
+                      self.get_state(task.state),
+                      self.get_exit(task.exit_state),
+                      int(task.on_cpu)])
 
