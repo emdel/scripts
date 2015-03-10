@@ -25,7 +25,7 @@ import volatility.utils as utils
 import volatility.scan as scan
 import volatility.plugins.linux.common as linux_common
 import volatility.obj as obj
-import struct
+import struct, collections
 
 
 '''
@@ -51,10 +51,10 @@ class kstackps(linux_common.AbstractLinuxCommand):
     This is just a POC.
     TODO: 
         * x64 support
-        * stronger signature for the task_struct
-        * psscan like plugin (see the previous point)
+        * stronger signature for the task_struct [DONE]
         * Find a way to distinguish between dead and hidden
           processes - Exit_state?
+        * psscan like plugin (see the previous point)
         * Create a real Scanner - I had some issues today
     '''
     def __init__(self, config, *args, **kwargs):
@@ -65,13 +65,29 @@ class kstackps(linux_common.AbstractLinuxCommand):
         for offset in xrange(KERNEL_BASE_x32, KERNEL_MAX_x32, 0x2000):
             try: thread_info_addr = struct.unpack('<I', self.addr_space.read(offset, SIZE_x32))[0]
             except: continue
+            if thread_info_addr < KERNEL_BASE_x32 or thread_info_addr > KERNEL_MAX_x32: continue
             cur = obj.Object("task_struct", thread_info_addr, self.addr_space)
             # TODO: improve task_struct signature
-            if cur.is_valid_task() and cur.pid > 0 and cur.pid < 32768 \
-            and cur.state >= 0 and cur.state < 512 and cur.parent > KERNEL_BASE_x32\
-            and cur.parent < KERNEL_MAX_x32 and cur.exit_state >= 0 and \
-            cur.exit_state <= 32:
-                yield cur
+            #if cur.is_valid_task() and cur.pid > 0 and cur.pid < 32768 and \
+            #   cur.state >= 0 and cur.state < 512 and cur.parent > KERNEL_BASE_x32 and \
+            #   cur.parent < KERNEL_MAX_x32 and cur.exit_state >= 0 and \
+            #   cur.exit_state <= 32:
+            if cur.se.v() > KERNEL_BASE_x32 and cur.se.v() < KERNEL_MAX_x32 and \
+               cur.sched_info.v() > KERNEL_BASE_x32 and cur.sched_info.v() < KERNEL_MAX_x32 and \
+               cur.stack > KERNEL_BASE_x32 and cur.stack < KERNEL_MAX_x32 and \
+               cur.cred.v() > KERNEL_BASE_x32 and cur.cred.v() < KERNEL_MAX_x32 and \
+               cur.thread.v() > KERNEL_BASE_x32 and cur.thread.v() < KERNEL_MAX_x32 and \
+               cur.seccomp.v() > KERNEL_BASE_x32 and cur.seccomp.v() < KERNEL_MAX_x32 and \
+               cur.pid >= 0 and cur.pid <= 0xffffffff and \
+               cur.exit_state >= 0 and cur.exit_state <= 0xffffffff and \
+               cur.state >= 0 and cur.state <= 0xffffffff and \
+               cur.exit_code >= 0 and cur.exit_code <= 0xffffffff and \
+               cur.signal > KERNEL_BASE_x32 and cur.signal < KERNEL_MAX_x32 and \
+               cur.start_time.v() > KERNEL_BASE_x32 and cur.start_time.v() < KERNEL_MAX_x32 and \
+               cur.se.cfs_rq > KERNEL_BASE_x32 and cur.se.cfs_rq < KERNEL_MAX_x32 and \
+               cur.se.run_node.v() > KERNEL_BASE_x32 and cur.se.run_node.v() < KERNEL_MAX_x32 and \
+               cur.se.statistics.v() > KERNEL_BASE_x32 and cur.se.statistics.v() < KERNEL_MAX_x32:
+               yield cur
             
     def render_text(self, outfd, data):
         processes = {}
@@ -82,7 +98,8 @@ class kstackps(linux_common.AbstractLinuxCommand):
                 proc_hits[task.pid] = 0
            else:
                 proc_hits[task.pid] += 1
-        for k, v in processes.items():
+        procs = collections.OrderedDict(sorted(processes.items()))
+        for k, v in procs.items():
             print "%d - %s" % (k, v)
         # Why some procs are so many times in memory? Cache?
         #for k, v in proc_hits.items():
