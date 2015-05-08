@@ -32,6 +32,7 @@ import struct, collections
 References: 
 - A guide to kernel exploitation - pages 126-132
 - https://jon.oberheide.org/blog/2010/11/29/exploiting-stack-overflows-in-the-linux-kernel/
+- Robust Signatures for Kernel Data Structures - http://www.cc.gatech.edu/~brendan/ccs09_siggen.pdf
 - Linux kernel source code
 '''
 
@@ -43,19 +44,19 @@ KERNEL_MAX_x32 = 0xffffffff
 
 class kstackps(linux_common.AbstractLinuxCommand):
     '''
-    Walk the kernel pages to discover task_structs.
-    We are interested in kernel stack pages and we 
-    leverage the thread_info data structure, the first 
-    field is a pointer to the task_struct owning 
-    the current kernel stack.
+    Walk the kernel pages to discover 'task_struct' data structures.
+    We are interested in kernel stack pages and we leverage the 
+    thread_info data structure, the first field is a pointer to the 
+    task_struct owning the current kernel stack (see the references)
     This is just a POC.
     TODO: 
         * x64 support
+        * Android support
         * stronger signature for the task_struct [DONE]
         * Find a way to distinguish between dead and hidden
           processes - Exit_state?
         * psscan like plugin (see the previous point)
-        * Create a real Scanner - I had some issues today
+        * Create a real Scanner
     '''
     def __init__(self, config, *args, **kwargs):
         linux_common.AbstractLinuxCommand.__init__(self, config, *args, **kwargs)
@@ -67,11 +68,7 @@ class kstackps(linux_common.AbstractLinuxCommand):
             except: continue
             if thread_info_addr < KERNEL_BASE_x32 or thread_info_addr > KERNEL_MAX_x32: continue
             cur = obj.Object("task_struct", thread_info_addr, self.addr_space)
-            # TODO: improve task_struct signature
-            #if cur.is_valid_task() and cur.pid > 0 and cur.pid < 32768 and \
-            #   cur.state >= 0 and cur.state < 512 and cur.parent > KERNEL_BASE_x32 and \
-            #   cur.parent < KERNEL_MAX_x32 and cur.exit_state >= 0 and \
-            #   cur.exit_state <= 32:
+            # TODO: improve task_struct validation -- See moyix approach 
             if cur.se.v() > KERNEL_BASE_x32 and cur.se.v() < KERNEL_MAX_x32 and \
                cur.sched_info.v() > KERNEL_BASE_x32 and cur.sched_info.v() < KERNEL_MAX_x32 and \
                cur.stack > KERNEL_BASE_x32 and cur.stack < KERNEL_MAX_x32 and \
